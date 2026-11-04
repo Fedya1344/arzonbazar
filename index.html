@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Narxlar Qidiruvi - Do'konlar Narxlarini Taqqoslash</title>
+    <!-- Font Awesome Ikonkalari -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* === DASTUR STILLARI VA DZN TIZIMI === */
+        :root {
+            /* Yorug' rejim (Light mode) o'zgaruvchilari */
+            --bg-primary: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-secondary: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            
+            /* Yashil rangli brend palletasi */
+            --primary: #10b981;
+            --primary-hover: #059669;
+            --primary-light: #d1fae5;
+            --primary-dark: #065f46;
+            
+            /* Status va xabar ranglari */
+            --badge-cheapest-bg: #ecfdf5;
+            --badge-cheapest-text: #047857;
+            --badge-cheapest-border: #a7f3d0;
+            
+            --unavailable-bg: #fef2f2;
+            --unavailable-text: #991b1b;
+            
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-full: 9999px;
+            
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Qorong'i rejim (Dark mode) o'zgaruvchilari */
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-card: #1e293b;
+            --bg-secondary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --border-color: #334155;
+            
+            --badge-cheapest-bg: #064e3b;
+            --badge-cheapest-text: #6ee7b7;
+            --badge-cheapest-border: #047857;
+            
+            --unavailable-bg: #451a1a;
+            --unavailable-text: #fca5a5;
+        }
+
+        /* Umumiy reset va asosiy sozlamalar */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            padding-bottom: 90px; /* Savat paneli uchun joy */
+        }
+
+        /* === YUQORI SARTAVHA (HEADER) === */
+        header {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            backdrop-filter: blur(8px);
+            background-color: rgba(var(--bg-card), 0.95);
+        }
+
+        .header-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .logo-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .logo-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+        }
+
+        .logo-title span {
+            color: var(--primary);
+        }
+
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 1.1rem;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            background: var(--border-color);
+        }
+
+        /* === ASOSIY QISM (MAIN CONTAINER) === */
+        main {
+            max-width: 1000px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px 16px;
+            flex: 1;
+        }
+
+        /* === QIDIRUV VA FILTR QISMI === */
+        .search-section {
+            margin-bottom: 24px;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 48px 16px 48px;
+            font-size: 1.05rem;
+            border-radius: var(--radius-lg);
+            border: 2px solid var(--border-color);
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            outline: none;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            pointer-events: none;
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-secondary);
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-full);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: var(--transition);
+        }
+
+        .clear-search.visible {
+            display: flex;
+        }
+
+        .clear-search:hover {
+            background: var(--border-color);
+        }
+
+        /* Kategoriya tugmalari */
+        .categories-wrapper {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+
+        .categories-wrapper::-webkit-scrollbar {
+            display: none; /* Chrome/Safari/Opera */
+        }
+
+        .category-chip {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: var(--radius-full);
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .category-chip:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .category-chip.active {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Sarlavha xabar oynasi */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .results-count {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* === MAHSULOTLAR RO'YXATI GRID === */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 16px;
+        }
+
+        @media (min-width: 640px) {
+            .products-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* === MAHSULOT KARTASI === */
+        .product-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+            position: relative;
+        }
+
+        .product-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 8px;
+        }
+
+        .product-title-group {
+            flex: 1;
+        }
+
+        .product-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.3;
+            margin-bottom: 4px;
+        }
+
+        .product-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .category-badge {
+            font-size: 0.75rem;
+            background-color: var(--bg-secondary);
+            color: var(--text-secondary);
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            font-weight: 500;
+        }
+
+        .unit-badge {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .add-basket-btn {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .add-basket-btn:hover {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            border-color: var(--primary-light);
+        }
+
+        .add-basket-btn.in-cart {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Do'konlar va narxlar ro'yxati */
+        .store-prices-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 10px;
+        }
+
+        .store-price-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
+            transition: var(--transition);
+        }
+
+        .store-name {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .store-price-info {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .price-val {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .price-diff {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Eng arzon narx ko'rinishi */
+        .store-price-row.cheapest {
+            background-color: var(--badge-cheapest-bg);
+            border: 1px solid var(--badge-cheapest-border);
+        }
+
+        .store-price-row.cheapest .store-name {
+            color: var(--badge-cheapest-text);
+            font-weight: 700;
+        }
+
+        .store-price-row.cheapest .price-val {
+            color: var(--badge-cheapest-text);
+            font-weight: 800;
+            font-size: 0.95rem;
+        }
+
+        .cheapest-tag {
+            background-color: var(--primary);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 2px 5px;
+            border-radius: 4px;
+            letter-spacing: 0.03em;
+        }
+
+        /* Mavjud emas narx ko'rinishi */
+        .store-price-row.unavailable {
+            opacity: 0.6;
+        }
+
+        .store-price-row.unavailable .price-val {
+            font-weight: 400;
+            font-size: 0.8rem;
+            color: var(--unavailable-text);
+            font-style: italic;
+        }
+
+        /* === TOPILMADI (EMPTY STATE) === */
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            margin: 20px 0;
+        }
+
+        .no-results-icon {
+            font-size: 3rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .no-results-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .no-results-text {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            max-width: 400px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        /* === SAVAT FOOTER / MODAL PANELI === */
+        .cart-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 50;
+            transition: var(--transition);
+            transform: translateY(100%);
+        }
+
+        .cart-bar.visible {
+            transform: translateY(0);
+        }
+
+        .cart-bar-header {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .cart-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cart-badge-count {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 700;
+            font-size: 0.85rem;
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cart-best-store {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .cart-best-store span {
+            color: var(--primary);
+            font-weight: 800;
+        }
+
+        .cart-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-cart-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+        }
+
+        .toggle-cart-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        /* Savat tafsilotlari modali (Expandable) */
+        .cart-details {
+            max-width: 1000px;
+            margin: 0 auto;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .cart-bar.expanded .cart-details {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .cart-details-content {
+            padding: 16px;
+        }
+
+        /* Savatdagi do'konlar taqqoslovi jamlanmasi */
+        .cart-store-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .store-sum-card {
+            background-color: var(--bg-secondary);
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            text-align: center;
+            border: 1px solid transparent;
+        }
+
+        .store-sum-card.winner {
+            background-color: var(--badge-cheapest-bg);
+            border-color: var(--badge-cheapest-border);
+        }
+
+        .store-sum-card .s-name {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .store-sum-card.winner .s-name {
+            color: var(--badge-cheapest-text);
+        }
+
+        .store-sum-card .s-price {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .store-sum-card.winner .s-price {
+            color: var(--badge-cheapest-text);
+        }
+
+        .store-sum-card .s-missing {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Savatdagi mahsulotlar ro'yxati */
+        .cart-items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .cart-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background-color: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .cart-item-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .cart-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .qty-btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            width: 26px;
+            height: 26px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .qty-btn:hover {
+            background-color: var(--bg-secondary);
+        }
+
+        .qty-val {
+            font-weight: 700;
+            font-size: 0.9rem;
+            width: 18px;
+            text-align: center;
+        }
+
+        .remove-item-btn {
+            color: #ef4444;
+            background: none;
+            border: none;
+            cursor: pointer;
+            margin-left: 6px;
+            font-size: 0.9rem;
+        }
+
+        /* === FOOTER === */
+        footer {
+            text-align: center;
+            padding: 20px 16px;
+            border-top: 1px solid var(--border-color);
+            margin-top: auto;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Animatsiyalar */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- YUQORI HEADER -->
+    <header>
+        <div class="header-container">
+            <a href="#" class="logo-area" onclick="resetFilters()">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-tags"></i>
+                </div>
+                <div class="logo-title">Narx<span>Qidiruv</span></div>
+            </a>
+            <button class="theme-toggle" id="themeToggleBtn" title="Rejimni o'zgartirish">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ASOSIY SHABLON -->
+    <main>
+        <!-- Qidiruv va Kategoriya qismi -->
+        <section class="search-section">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="searchInput" class="search-input" placeholder="Mahsulot nomini yozing (masalan: sut, go'sht, un)..." autocomplete="off">
+                <button id="clearSearchBtn" class="clear-search"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Kategoriya Tugmalari -->
+            <div class="categories-wrapper" id="categoriesContainer">
+                <!-- JS orqali to'ldiriladi -->
+            </div>
+        </section>
+
+        <!-- Sarlavha paneli -->
+        <div class="section-header">
+            <h2 class="section-title" id="sectionTitle">Mashhur mahsulotlar</h2>
+            <span class="results-count" id="resultsCount">0 ta mahsulot</span>
+        </div>
+
+        <!-- Mahsulotlar ro'yxati -->
+        <div class="products-grid" id="productsGrid">
+            <!-- JS orqali kartochkalar chiqariladi -->
+        </div>
+
+        <!-- Topilmadi holati (Hidden by default) -->
+        <div class="no-results" id="noResults" style="display: none;">
+            <i class="fa-solid fa-basket-shopping no-results-icon"></i>
+            <h3 class="no-results-title">Mahsulot topilmadi</h3>
+            <p class="no-results-text">
+                Kiritilgan so'z bo'yicha hech narsa topilmadi. So'zni to'g'ri yozganingizni tekshiring yoki boshqa kategoriya tanlang.
+            </p>
+        </div>
+    </main>
+
+    <!-- SAVAT / DO'KONLARNI TAQQOSLASH PANELI (BOTTOM BAR) -->
+    <div class="cart-bar" id="cartBar">
+        <div class="cart-bar-header" id="cartBarHeader">
+            <div class="cart-info">
+                <div class="cart-badge-count" id="cartCount">0</div>
+                <div class="cart-best-store" id="cartBestStoreInfo">
+                    Savat bosilsa hisoblanadi
+                </div>
+            </div>
+            <div class="cart-actions">
+                <button class="toggle-cart-btn" id="toggleCartBtn">
+                    <span>Savat va Taqqoslash</span>
+                    <i class="fa-solid fa-chevron-up" id="cartChevron"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Savatning yoyiladigan qismi -->
+        <div class="cart-details">
+            <div class="cart-details-content">
+                <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 10px;">Do'konlar bo'yicha umumiy summalar:</h4>
+                <div class="cart-store-comparison" id="cartStoreComparison">
+                    <!-- JS orqali har bir do'kondagi savat summasi chiqadi -->
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="font-size: 0.95rem; font-weight: 700;">Savatdagi mahsulotlar:</h4>
+                    <button onclick="clearCart()" style="background:none; border:none; color:#ef4444; font-size:0.8rem; font-weight:600; cursor:pointer;">
+                        <i class="fa-solid fa-trash-can"></i> Savatni tozalash
+                    </button>
+                </div>
+
+                <div class="cart-items-list" id="cartItemsList">
+                    <!-- JS orqali savat elementlari chiqadi -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>Eslatma: Narxlar namunaviy ko'rinishda taqdim etilgan.</p>
+        <p style="margin-top: 4px;">&copy; 2026 NarxQidiruv - Barcha huquqlar himoyalangan.</p>
+    </footer>
+
+    <!-- JS MANTIQ VA MA'LUMOTLAR BAZASI -->
+    <script>
+        /* ==========================================================================
+           1. MA'LUMOTLAR BAZASI (40 TA MAHSULOT VA 5 TA DO'KON NARXLARI)
+           ========================================================================== */
+        const STORES = ['Korzinka', 'Makro', 'Havas', 'Bozor', 'Mahalla do\'koni'];
+
+        const products = [
+            { id: 1, name: "Sut (3.2% pasterizatsiyalangan)", category: "Sut mahsulotlari", unit: "1 l", popular: true, prices: { "Korzinka": 12500, "Makro": 12900, "Havas": 11200, "Bozor": 11000, "Mahalla do'koni": 13000 } },
+            { id: 2, name: "Qolip non (Buxanka)", category: "Oziq-ovqat", unit: "1 dona", popular: true, prices: { "Korzinka": 3000, "Makro": 3200, "Havas": 2800, "Bozor": 2800, "Mahalla do'koni": 3000 } },
+            { id: 3, name: "Guruch (Lazer)", category: "Oziq-ovqat", unit: "1 kg", popular: true, prices: { "Korzinka": 26000, "Makro": 27500, "Havas": 24000, "Bozor": 22000, "Mahalla do'koni": 28000 } },
+            { id: 4, name: "Shakar (O'zbekiston)", category: "Oziq-ovqat", unit: "1 kg", popular: true, prices: { "Korzinka": 13500, "Makro": 13800, "Havas": 12900, "Bozor": 12500, "Mahalla do'koni": 14000 } },
+            { id: 5, name: "O'simlik yog'i (Pramoy/Pishiq 1L)", category: "Oziq-ovqat", unit: "1 l", popular: true, prices: { "Korzinka": 17500, "Makro": 18000, "Havas": 16200, "Bozor": 16000, "Mahalla do'koni": 18500 } },
+            { id: 6, name: "Tuxum (C1 toifa)", category: "Sut mahsulotlari", unit: "10 dona", popular: true, prices: { "Korzinka": 15000, "Makro": 15500, "Havas": 13800, "Bozor": 13000, "Mahalla do'koni": 16000 } },
+            { id: 7, name: "Kartoshka (Mahalliy)", category: "Meva-sabzavot", unit: "1 kg", popular: true, prices: { "Korzinka": 6500, "Makro": 6800, "Havas": 5800, "Bozor": 5000, "Mahalla do'koni": 7000 } },
+            { id: 8, name: "Piyoz", category: "Meva-sabzavot", unit: "1 kg", popular: true, prices: { "Korzinka": 3500, "Makro": 3800, "Havas": 3200, "Bozor": 2500, "Mahalla do'koni": 4000 } },
+            { id: 9, name: "Sabzi (Sariq)", category: "Meva-sabzavot", unit: "1 kg", popular: false, prices: { "Korzinka": 4500, "Makro": 4800, "Havas": 4000, "Bozor": 3000, "Mahalla do'koni": 5000 } },
+            { id: 10, name: "Mol go'shti (Lahm)", category: "Go'sht", unit: "1 kg", popular: true, prices: { "Korzinka": 95000, "Makro": 98000, "Havas": null, "Bozor": 85000, "Mahalla do'koni": 92000 } },
+            { id: 11, name: "Tovuq go'shti (Butun/Muzlatilgan)", category: "Go'sht", unit: "1 kg", popular: true, prices: { "Korzinka": 31000, "Makro": 32500, "Havas": 28900, "Bozor": 28000, "Mahalla do'koni": 33000 } },
+            { id: 12, name: "Qora choy (Karkade / Ahmad Tea 100g)", category: "Ichimlik", unit: "1 quti", popular: false, prices: { "Korzinka": 18500, "Makro": 19000, "Havas": 17000, "Bozor": 16500, "Mahalla do'koni": 20000 } },
+            { id: 13, name: "Un (Oliy nav 1kg)", category: "Oziq-ovqat", unit: "1 kg", popular: false, prices: { "Korzinka": 9500, "Makro": 9800, "Havas": 8500, "Bozor": 8000, "Mahalla do'koni": 10000 } },
+            { id: 14, name: "Makaron (Makfa 400g)", category: "Oziq-ovqat", unit: "1 quti", popular: false, prices: { "Korzinka": 8500, "Makro": 8900, "Havas": 7800, "Bozor": 7500, "Mahalla do'koni": 9000 } },
+            { id: 15, name: "Pomidor (Issiqxona)", category: "Meva-sabzavot", unit: "1 kg", popular: true, prices: { "Korzinka": 22000, "Makro": 24000, "Havas": 20000, "Bozor": 18000, "Mahalla do'koni": 25000 } },
+            { id: 16, name: "Olma (Fuji/Semirenko)", category: "Meva-sabzavot", unit: "1 kg", popular: false, prices: { "Korzinka": 14000, "Makro": 15000, "Havas": 12500, "Bozor": 10000, "Mahalla do'koni": 15000 } },
+            { id: 17, name: "Banan", category: "Meva-sabzavot", unit: "1 kg", popular: true, prices: { "Korzinka": 21000, "Makro": 22000, "Havas": 19500, "Bozor": 19000, "Mahalla do'koni": 23000 } },
+            { id: 18, name: "Gazsiz suv (Montella/Hydrolife 1.5L)", category: "Ichimlik", unit: "1 dona", popular: false, prices: { "Korzinka": 3500, "Makro": 3800, "Havas": 3000, "Bozor": 3000, "Mahalla do'koni": 4000 } },
+            { id: 19, name: "Meva sharbati (Crafers/Bliss 1L)", category: "Ichimlik", unit: "1 dona", popular: false, prices: { "Korzinka": 14500, "Makro": 15000, "Havas": 13200, "Bozor": 13000, "Mahalla do'koni": 16000 } },
+            { id: 20, name: "KIR sovuni / Qattiq sovun (Duru 1dona)", category: "Maishiy", unit: "1 dona", popular: false, prices: { "Korzinka": 7500, "Makro": 8000, "Havas": 6800, "Bozor": 6500, "Mahalla do'koni": 8500 } },
+            { id: 21, name: "Tvorog (Musaffo 200g)", category: "Sut mahsulotlari", unit: "1 pachka", popular: false, prices: { "Korzinka": 14500, "Makro": 15200, "Havas": 13500, "Bozor": null, "Mahalla do'koni": 15500 } },
+            { id: 22, name: "Sariyog' (Ankor 200g)", category: "Sut mahsulotlari", unit: "1 pachka", popular: false, prices: { "Korzinka": 32000, "Makro": 33500, "Havas": 29800, "Bozor": 29000, "Mahalla do'koni": 34000 } },
+            { id: 23, name: "Smetana (Musaffo 15% 200g)", category: "Sut mahsulotlari", unit: "1 idish", popular: false, prices: { "Korzinka": 11000, "Makro": 11500, "Havas": 9800, "Bozor": null, "Mahalla do'koni": 12000 } },
+            { id: 24, name: "Bodring", category: "Meva-sabzavot", unit: "1 kg", popular: false, prices: { "Korzinka": 18000, "Makro": 19500, "Havas": 16000, "Bozor": 14000, "Mahalla do'koni": 20000 } },
+            { id: 25, name: "Karam", category: "Meva-sabzavot", unit: "1 kg", popular: false, prices: { "Korzinka": 4000, "Makro": 4200, "Havas": 3500, "Bozor": 2500, "Mahalla do me'yori": 4500 } },
+            { id: 26, name: "Qo'y go'shti (Qovurg'a)", category: "Go'sht", unit: "1 kg", popular: false, prices: { "Korzinka": 105000, "Makro": 108000, "Havas": null, "Bozor": 95000, "Mahalla do'koni": 100000 } },
+            { id: 27, name: "Qiyma go'sht (Aralash)", category: "Go'sht", unit: "1 kg", popular: false, prices: { "Korzinka": 78000, "Makro": 82000, "Havas": 72000, "Bozor": 70000, "Mahalla do'koni": 80000 } },
+            { id: 28, name: "Osh tuz (1kg)", category: "Oziq-ovqat", unit: "1 pachka", popular: false, prices: { "Korzinka": 2500, "Makro": 2800, "Havas": 2200, "Bozor": 2000, "Mahalla do'koni": 3000 } },
+            { id: 29, name: "Tomat pastasi (350g)", category: "Oziq-ovqat", unit: "1 banka", popular: false, prices: { "Korzinka": 12000, "Makro": 12800, "Havas": 11000, "Bozor": 10500, "Mahalla do'koni": 13000 } },
+            { id: 30, name: "Greshka (Yarma 1kg)", category: "Oziq-ovqat", unit: "1 kg", popular: false, prices: { "Korzinka": 14000, "Makro": 14800, "Havas": 12500, "Bozor": 11000, "Mahalla do'koni": 15000 } },
+            { id: 31, name: "Mosh (1kg)", category: "Oziq-ovqat", unit: "1 kg", popular: false, prices: { "Korzinka": 15000, "Makro": 16000, "Havas": 13800, "Bozor": 12000, "Mahalla do'koni": 16000 } },
+            { id: 32, name: "Lobiya (Nuxot 1kg)", category: "Oziq-ovqat", unit: "1 kg", popular: false, prices: { "Korzinka": 20000, "Makro": 21500, "Havas": 18500, "Bozor": 17000, "Mahalla do'koni": 22000 } },
+            { id: 33, name: "Coca-Cola (1.5L)", category: "Ichimlik", unit: "1 idish", popular: true, prices: { "Korzinka": 12500, "Makro": 13000, "Havas": 11800, "Bozor": 11500, "Mahalla do'koni": 13000 } },
+            { id: 34, name: "Yashil choy (No95 100g)", category: "Ichimlik", unit: "1 quti", popular: false, prices: { "Korzinka": 9000, "Makro": 9500, "Havas": 8200, "Bozor": 7500, "Mahalla do'koni": 10000 } },
+            { id: 35, name: "Qahva (Nescafe Gold 95g)", category: "Ichimlik", unit: "1 banka", popular: false, prices: { "Korzinka": 52000, "Makro": 54000, "Havas": 48000, "Bozor": 46000, "Mahalla do'koni": 55000 } },
+            { id: 36, name: "Kir yuvish kukuni (Ariel 1.5kg)", category: "Maishiy", unit: "1 pachka", popular: false, prices: { "Korzinka": 48000, "Makro": 50000, "Havas": 44000, "Bozor": 42000, "Mahalla do'koni": 52000 } },
+            { id: 37, name: "Idish yuvish suyuqligi (Fairy 450ml)", category: "Maishiy", unit: "1 dona", popular: false, prices: { "Korzinka": 17500, "Makro": 18200, "Havas": 16000, "Bozor": 15500, "Mahalla do'koni": 19000 } },
+            { id: 38, name: "Tish pastasi (Colgate 100ml)", category: "Maishiy", unit: "1 dona", popular: false, prices: { "Korzinka": 16000, "Makro": 16800, "Havas": 14500, "Bozor": 14000, "Mahalla do'koni": 17500 } },
+            { id: 39, name: "Suyuq sovun (500ml)", category: "Maishiy", unit: "1 dona", popular: false, prices: { "Korzinka": 15000, "Makro": 16000, "Havas": 13500, "Bozor": 12500, "Mahalla do'koni": 17000 } },
+            { id: 40, name: "Tualet qog'ozi (4 dona)", category: "Maishiy", unit: "1 o'ram", popular: false, prices: { "Korzinka": 12000, "Makro": 12500, "Havas": 10500, "Bozor": 9500, "Mahalla do'koni": 13000 } }
+        ];
+
+        const CATEGORIES = ["Barchasi", "Sut mahsulotlari", "Meva-sabzavot", "Go'sht", "Oziq-ovqat", "Ichimlik", "Maishiy"];
+
+        /* ==========================================================================
+           2. ILOVA HOLATI (APP STATE)
+           ========================================================================== */
+        let currentSearchQuery = "";
+        let currentCategory = "Barchasi";
+        let cart = {}; // { productId: quantity }
+
+        /* ==========================================================================
+           3. DOM ELEMENTLARINI OLISH
+           ========================================================================== */
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        const categoriesContainer = document.getElementById('categoriesContainer');
+        const productsGrid = document.getElementById('productsGrid');
+        const noResults = document.getElementById('noResults');
+        const sectionTitle = document.getElementById('sectionTitle');
+        const resultsCount = document.getElementById('resultsCount');
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+        // Savat elementlari
+        const cartBar = document.getElementById('cartBar');
+        const cartBarHeader = document.getElementById('cartBarHeader');
+        const toggleCartBtn = document.getElementById('toggleCartBtn');
+        const cartCount = document.getElementById('cartCount');
+        const cartBestStoreInfo = document.getElementById('cartBestStoreInfo');
+        const cartChevron = document.getElementById('cartChevron');
+        const cartStoreComparison = document.getElementById('cartStoreComparison');
+        const cartItemsList = document.getElementById('cartItemsList');
+
+        /* ==========================================================================
+           4. YORDAMCHI FUNKSIYALAR (FORMATTING & HELPERS)
+           ========================================================================== */
+        // Raqamni so'm formatiga o'tkazish (masalan: 12500 -> "12 500 so'm")
+        function formatPrice(amount) {
+            if (amount === null || amount === undefined) return "Mavjud emas";
+            return amount.toLocaleString('uz-UZ').replace(/,/g, ' ') + " so'm";
+        }
+
+        // Kichik narx farqini formatlash (masalan: + 1 500 so'm)
+        function formatDiff(diff) {
+            if (diff === 0) return "";
+            return `+ ${diff.toLocaleString('uz-UZ').replace(/,/g, ' ')} so'm`;
+        }
+
+        /* ==========================================================================
+           5. REJIM (LIGHT/DARK MODE) VA TADBIRLAR
+           ========================================================================== */
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+                updateThemeIcon(savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                updateThemeIcon('dark');
+            }
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = themeToggleBtn.querySelector('i');
+            if (theme === 'dark') {
+                icon.className = 'fa-solid fa-sun';
+            } else {
+                icon.className = 'fa-solid fa-moon';
+            }
+        }
+
+        themeToggleBtn.addEventListener('click', toggleTheme);
+
+        /* ==========================================================================
+           6. KATEGORIYALARNI CHIQARISH VA FILTRLASH
+           ========================================================================== */
+        function renderCategories() {
+            categoriesContainer.innerHTML = '';
+            CATEGORIES.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = `category-chip ${cat === currentCategory ? 'active' : ''}`;
+                btn.textContent = cat;
+                btn.addEventListener('click', () => {
+                    currentCategory = cat;
+                    renderCategories();
+                    filterAndRenderProducts();
+                });
+                categoriesContainer.appendChild(btn);
+            });
+        }
+
+        function resetFilters() {
+            currentSearchQuery = "";
+            currentCategory = "Barchasi";
+            searchInput.value = "";
+            clearSearchBtn.classList.remove('visible');
+            renderCategories();
+            filterAndRenderProducts();
+        }
+
+        /* ==========================================================================
+           7. MAHSULOTLARNI FILTRLASH VA EKRANGA CHIQARISH
+           ========================================================================== */
+        function filterAndRenderProducts() {
+            const query = currentSearchQuery.toLowerCase().trim();
+
+            const filtered = products.filter(p => {
+                const matchesSearch = p.name.toLowerCase().includes(query);
+                const matchesCategory = currentCategory === "Barchasi" || p.category === currentCategory;
+                return matchesSearch && matchesCategory;
+            });
+
+            // Sarlavhani yangilash
+            if (query !== "") {
+                sectionTitle.textContent = `"${currentSearchQuery}" bo'yicha natijalar`;
+            } else if (currentCategory !== "Barchasi") {
+                sectionTitle.textContent = `${currentCategory}`;
+            } else {
+                sectionTitle.textContent = "Mashhur mahsulotlar";
+            }
+
+            resultsCount.textContent = `${filtered.length} ta mahsulot`;
+
+            if (filtered.length === 0) {
+                productsGrid.innerHTML = '';
+                noResults.style.display = 'block';
+            } else {
+                noResults.style.display = 'none';
+                renderProductGrid(filtered);
+            }
+        }
+
+        function renderProductGrid(items) {
+            productsGrid.innerHTML = '';
+
+            items.forEach(product => {
+                // Do'konlar narxini tartiblash (Mavjud narxlarni eng arzonidan qimmatiga, null joylarni oxiriga)
+                const storePricePairs = [];
+                STORES.forEach(store => {
+                    storePricePairs.push({
+                        store: store,
+                        price: product.prices[store]
+                    });
+                });
+
+                // Saralash
+                storePricePairs.sort((a, b) => {
+                    if (a.price === null) return 1;
+                    if (b.price === null) return -1;
+                    return a.price - b.price;
+                });
+
+                // Eng arzon narxni aniqlash
+                const minPrice = storePricePairs.find(p => p.price !== null)?.price || null;
+
+                // Kartochka yaratish
+                const card = document.createElement('div');
+                card.className = 'product-card animate-fade-in';
+
+                const isInCart = cart[product.id] > 0;
+
+                // Kartochka HTML tuzilishi
+                let pricesHtml = '';
+                storePricePairs.forEach(pair => {
+                    const isAvailable = pair.price !== null;
+                    const isCheapest = isAvailable && pair.price === minPrice;
+                    const diff = isAvailable ? pair.price - minPrice : 0;
+
+                    pricesHtml += `
+                        <div class="store-price-row ${isCheapest ? 'cheapest' : ''} ${!isAvailable ? 'unavailable' : ''}">
+                            <div class="store-name">
+                                <span>${pair.store}</span>
+                                ${isCheapest ? '<span class="cheapest-tag">Eng arzon</span>' : ''}
+                            </div>
+                            <div class="store-price-info">
+                                <span class="price-val">${formatPrice(pair.price)}</span>
+                                ${(!isCheapest && isAvailable) ? `<span class="price-diff">${formatDiff(diff)}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div>
+                        <div class="product-header">
+                            <div class="product-title-group">
+                                <h3 class="product-name">${product.name}</h3>
+                                <div class="product-meta">
+                                    <span class="category-badge">${product.category}</span>
+                                    <span class="unit-badge"><i class="fa-solid fa-scale-unbalanced-flip"></i> ${product.unit}</span>
+                                </div>
+                            </div>
+                            <button class="add-basket-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCartItem(${product.id})">
+                                <i class="fa-solid ${isInCart ? 'fa-check' : 'fa-cart-plus'}"></i>
+                                <span>${isInCart ? 'Savatda' : 'Savatga'}</span>
+                            </button>
+                        </div>
+                        <div class="store-prices-list">
+                            ${pricesHtml}
+                        </div>
+                    </div>
+                `;
+
+                productsGrid.appendChild(card);
+            });
+        }
+
+        /* ==========================================================================
+           8. SAVAT MANTIQI VA TAQQOSLASH (BASKET & COMPARATOR)
+           ========================================================================== */
+        function toggleCartItem(productId) {
+            if (cart[productId]) {
+                delete cart[productId];
+            } else {
+                cart[productId] = 1;
+            }
+            updateCartUI();
+            filterAndRenderProducts(); // Kartochkadagi tugma holatini yangilash uchun
+        }
+
+        function updateQuantity(productId, delta) {
+            if (cart[productId]) {
+                cart[productId] += delta;
+                if (cart[productId] <= 0) {
+                    delete cart[productId];
+                }
+            }
+            updateCartUI();
+            filterAndRenderProducts();
+        }
+
+        function clearCart() {
+            cart = {};
+            updateCartUI();
+            filterAndRenderProducts();
+            cartBar.classList.remove('expanded');
+        }
+
+        function updateCartUI() {
+            const productIds = Object.keys(cart);
+            const totalItemsCount = productIds.reduce((sum, id) => sum + cart[id], 0);
+
+            if (totalItemsCount === 0) {
+                cartBar.classList.remove('visible');
+                cartBar.classList.remove('expanded');
+                return;
+            }
+
+            cartBar.classList.add('visible');
+            cartCount.textContent = totalItemsCount;
+
+            // Do'konlar bo'yicha umumiy summalarni hisoblash
+            const storeTotals = {};
+            const storeMissingCount = {};
+
+            STORES.forEach(store => {
+                storeTotals[store] = 0;
+                storeMissingCount[store] = 0;
+            });
+
+            productIds.forEach(id => {
+                const prod = products.find(p => p.id === parseInt(id));
+                const qty = cart[id];
+
+                if (prod) {
+                    STORES.forEach(store => {
+                        const price = prod.prices[store];
+                        if (price !== null) {
+                            storeTotals[store] += price * qty;
+                        } else {
+                            storeMissingCount[store] += 1;
+                        }
+                    });
+                }
+            });
+
+            // Eng arzon do'konni topish
+            let bestStore = null;
+            let minTotal = Infinity;
+
+            STORES.forEach(store => {
+                // Faqat barcha mahsulotlar mavjud bo'lgan yoki eng kam yetishmovchiligi bor do'konlarni birinchi o'ringa qo'yamiz
+                if (storeTotals[store] < minTotal) {
+                    minTotal = storeTotals[store];
+                    bestStore = store;
+                }
+            });
+
+            // Bottom bar matnini yangilash
+            cartBestStoreInfo.innerHTML = `Eng hamyonbop: <span>${bestStore}</span> (${formatPrice(minTotal)})`;
+
+            // Savat yoyilmasidagi do'konlar taqqoslovi
+            cartStoreComparison.innerHTML = '';
+            
+            // Do'konlarni jami narxi bo'yicha saralash
+            const sortedStores = [...STORES].sort((a, b) => storeTotals[a] - storeTotals[b]);
+
+            sortedStores.forEach(store => {
+                const total = storeTotals[store];
+                const missing = storeMissingCount[store];
+                const isWinner = store === bestStore;
+
+                const storeCard = document.createElement('div');
+                storeCard.className = `store-sum-card ${isWinner ? 'winner' : ''}`;
+                storeCard.innerHTML = `
+                    <div class="s-name">${store} ${isWinner ? '🏆' : ''}</div>
+                    <div class="s-price">${formatPrice(total)}</div>
+                    ${missing > 0 ? `<div class="s-missing">${missing} ta mahsulot yo'q</div>` : '<div class="s-missing" style="color:var(--primary)">Hamma mahsulot bor</div>'}
+                `;
+                cartStoreComparison.appendChild(storeCard);
+            });
+
+            // Savatdagi mahsulotlar ro'yxatini chiqarish
+            cartItemsList.innerHTML = '';
+            productIds.forEach(id => {
+                const prod = products.find(p => p.id === parseInt(id));
+                const qty = cart[id];
+
+                if (prod) {
+                    const itemRow = document.createElement('div');
+                    itemRow.className = 'cart-item';
+                    itemRow.innerHTML = `
+                        <span class="cart-item-title">${prod.name}</span>
+                        <div class="cart-item-controls">
+                            <button class="qty-btn" onclick="updateQuantity(${prod.id}, -1)">-</button>
+                            <span class="qty-val">${qty}</span>
+                            <button class="qty-btn" onclick="updateQuantity(${prod.id}, 1)">+</button>
+                            <button class="remove-item-btn" onclick="toggleCartItem(${prod.id})"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    `;
+                    cartItemsList.appendChild(itemRow);
+                }
+            });
+        }
+
+        // Savat panelini ochish/yopish
+        cartBarHeader.addEventListener('click', () => {
+            cartBar.classList.toggle('expanded');
+            if (cartBar.classList.contains('expanded')) {
+                cartChevron.className = 'fa-solid fa-chevron-down';
+            } else {
+                cartChevron.className = 'fa-solid fa-chevron-up';
+            }
+        });
+
+        /* ==========================================================================
+           9. QIDIRUV HODISALARI (EVENTS)
+           ========================================================================== */
+        searchInput.addEventListener('input', (e) => {
+            currentSearchQuery = e.target.value;
+            if (currentSearchQuery.length > 0) {
+                clearSearchBtn.classList.add('visible');
+            } else {
+                clearSearchBtn.classList.remove('visible');
+            }
+            filterAndRenderProducts();
+        });
+
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            currentSearchQuery = '';
+            clearSearchBtn.classList.remove('visible');
+            filterAndRenderProducts();
+            searchInput.focus();
+        });
+
+        /* ==========================================================================
+           10. DASTURNI ISHGA TUSHIRISH (INITIALIZATION)
+           ========================================================================== */
+        window.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            renderCategories();
+            filterAndRenderProducts();
+        });
+    </script>
+</body>
+</html>
