@@ -274,6 +274,13 @@
         }
 
         /* Sarlavha xabar oynasi */
+        .ml-panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); }
+        .ml-title { font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+        .ml-row { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; }
+        .ml-badge { flex: none; padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+        .ml-0 { background: var(--primary-light); color: var(--primary-dark); }
+        .ml-1 { background: #fef3c7; color: #92400e; }
+        .ml-2 { background: #fee2e2; color: #991b1b; }
         .section-header {
             display: flex;
             align-items: center;
@@ -779,6 +786,8 @@
             </div>
         </section>
 
+        <div class="ml-panel" id="mlStores"></div>
+
         <!-- Sarlavha paneli -->
         <div class="section-header">
             <h2 class="section-title" id="sectionTitle">Mashhur mahsulotlar</h2>
@@ -1118,11 +1127,20 @@
         function filterAndRenderProducts() {
             const query = currentSearchQuery.toLowerCase().trim();
 
-            const filtered = products.filter(p => {
-                const matchesSearch = p.name.toLowerCase().includes(query);
+            const queryVec = query ? tfidfVector(ngrams(query)) : null;
+            const scores = {};
+            const filtered = products.filter((p, i) => {
+                let matchesSearch = true;
+                if (query) {
+                    const sim = cosineSimilarity(queryVec, docVectors[i]);   // ML: TF-IDF kosinus o'xshashligi
+                    const exact = p.name.toLowerCase().includes(query);
+                    scores[p.id] = sim + (exact ? 1 : 0);
+                    matchesSearch = exact || sim >= 0.35;
+                }
                 const matchesCategory = currentCategory === "Barchasi" || p.category === currentCategory;
                 return matchesSearch && matchesCategory;
             });
+            if (query) filtered.sort((a, b) => scores[b.id] - scores[a.id]);
 
             // Sarlavhani yangilash
             if (query !== "") {
@@ -1289,16 +1307,10 @@
             });
 
             // Eng arzon do'konni topish
-            let bestStore = null;
-            let minTotal = Infinity;
-
-            STORES.forEach(store => {
-                // Faqat barcha mahsulotlar mavjud bo'lgan yoki eng kam yetishmovchiligi bor do'konlarni birinchi o'ringa qo'yamiz
-                if (storeTotals[store] < minTotal) {
-                    minTotal = storeTotals[store];
-                    bestStore = store;
-                }
-            });
+            // Avval mahsulotlari to'liq do'konlar, keyin eng arzon jami narx bo'yicha tanlanadi
+            const cmpStores = (a, b) => storeMissingCount[a] - storeMissingCount[b] || storeTotals[a] - storeTotals[b];
+            const bestStore = [...STORES].sort(cmpStores)[0];
+            const minTotal = storeTotals[bestStore];
 
             // Bottom bar matnini yangilash
             cartBestStoreInfo.innerHTML = `Eng hamyonbop: <span>${bestStore}</span> (${formatPrice(minTotal)})`;
@@ -1307,7 +1319,7 @@
             cartStoreComparison.innerHTML = '';
             
             // Do'konlarni jami narxi bo'yicha saralash
-            const sortedStores = [...STORES].sort((a, b) => storeTotals[a] - storeTotals[b]);
+            const sortedStores = [...STORES].sort(cmpStores);
 
             sortedStores.forEach(store => {
                 const total = storeTotals[store];
@@ -1381,9 +1393,103 @@
         /* ==========================================================================
            10. DASTURNI ISHGA TUSHIRISH (INITIALIZATION)
            ========================================================================== */
+        /* ==========================================================================
+           9. MASHINA O'RGANISHI (ML) QISMI
+           ========================================================================== */
+        // --- ML #1: TF-IDF + kosinus o'xshashlik (xato yozilgan so'zlarni ham topadi) ---
+        // Har bir mahsulot nomi 3 harfli bo'laklarga (n-gram) bo'linadi va vektorga aylantiriladi.
+        function ngrams(text) {
+            const s = ' ' + text.toLowerCase().replace(/[^a-z0-9' ]/g, '') + ' ';
+            const grams = [];
+            for (let i = 0; i < s.length - 2; i++) grams.push(s.slice(i, i + 3));
+            return grams;
+        }
+        const docGrams = products.map(p => ngrams(p.name));
+        const docFreq = {};
+        docGrams.forEach(g => new Set(g).forEach(t => { docFreq[t] = (docFreq[t] || 0) + 1; }));
+        const idf = t => Math.log((products.length + 1) / ((docFreq[t] || 0) + 1)) + 1;
+
+        function tfidfVector(grams) {
+            const v = {};
+            grams.forEach(t => { v[t] = (v[t] || 0) + 1; });
+            let norm = 0;
+            for (const t in v) { v[t] *= idf(t); norm += v[t] * v[t]; }
+            norm = Math.sqrt(norm) || 1;
+            for (const t in v) v[t] /= norm;
+            return v;
+        }
+        const docVectors = docGrams.map(tfidfVector);
+
+        function cosineSimilarity(a, b) {
+            let dot = 0;
+            for (const t in a) if (b[t]) dot += a[t] * b[t];
+            return dot;
+        }
+
+        // --- ML #2: K-Means klasterlash (do'konlarni arzon / o'rta / qimmat guruhlarga ajratish) ---
+        // Belgilar (features): 1) o'rtacha narx indeksi (narx / eng arzon narx), 2) mahsulot mavjudligi ulushi.
+        function storeFeatures() {
+            const sum = {}, count = {};
+            STORES.forEach(s => { sum[s] = 0; count[s] = 0; });
+            products.forEach(p => {
+                const vals = STORES.map(s => p.prices[s]).filter(v => v !== null);
+                const min = Math.min(...vals);
+                STORES.forEach(s => {
+                    if (p.prices[s] !== null) { sum[s] += p.prices[s] / min; count[s]++; }
+                });
+            });
+            return STORES.map(s => [sum[s] / count[s], count[s] / products.length]);
+        }
+
+        function kMeans(X, k, maxIter = 50) {
+            const d = X[0].length;
+            const mean = [], sd = [];
+            for (let j = 0; j < d; j++) {
+                const col = X.map(r => r[j]);
+                const m = col.reduce((a, b) => a + b, 0) / col.length;
+                mean.push(m);
+                sd.push(Math.sqrt(col.reduce((a, b) => a + (b - m) ** 2, 0) / col.length) || 1);
+            }
+            const Z = X.map(r => r.map((v, j) => (v - mean[j]) / sd[j])); // standartlashtirish
+            const order = Z.map((_, i) => i).sort((a, b) => Z[a][0] - Z[b][0]);
+            let C = Array.from({ length: k }, (_, c) => Z[order[Math.round(c * (Z.length - 1) / (k - 1))]].slice());
+            const labels = new Array(Z.length).fill(-1);
+            const dist = (a, b) => a.reduce((s, v, j) => s + (v - b[j]) ** 2, 0);
+            for (let it = 0; it < maxIter; it++) {
+                let changed = false;
+                Z.forEach((z, i) => {            // 1-qadam: eng yaqin markazni tanlash
+                    let best = 0, bd = Infinity;
+                    C.forEach((c, ci) => { const dd = dist(z, c); if (dd < bd) { bd = dd; best = ci; } });
+                    if (labels[i] !== best) { labels[i] = best; changed = true; }
+                });
+                C = C.map((c, ci) => {           // 2-qadam: markazni yangilash (o'rtacha)
+                    const pts = Z.filter((_, i) => labels[i] === ci);
+                    return pts.length ? c.map((_, j) => pts.reduce((s, p) => s + p[j], 0) / pts.length) : c;
+                });
+                if (!changed) break;
+            }
+            return { labels, centroids: C };
+        }
+
+        function renderStoreClusters() {
+            const X = storeFeatures();
+            const { labels, centroids } = kMeans(X, 3);
+            const rank = centroids.map((_, i) => i).sort((a, b) => centroids[a][0] - centroids[b][0]);
+            const names = ["Arzon", "O'rta", "Qimmat"];
+            const html = rank.map((ci, r) => {
+                const members = STORES.map((s, i) => ({ s, i })).filter(o => labels[o.i] === ci);
+                if (!members.length) return '';
+                const list = members.map(o => `${o.s} <small>(indeks ${X[o.i][0].toFixed(2)})</small>`).join(', ');
+                return `<div class="ml-row"><span class="ml-badge ml-${r}">${names[r]}</span><span>${list}</span></div>`;
+            }).join('');
+            document.getElementById('mlStores').innerHTML =
+                `<div class="ml-title"><i class="fa-solid fa-diagram-project"></i> Do'konlar tahlili (K-Means klasterlash)</div>${html}`;
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             initTheme();
             renderCategories();
+            renderStoreClusters();
             filterAndRenderProducts();
         });
     </script>
