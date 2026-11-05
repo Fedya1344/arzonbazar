@@ -278,6 +278,12 @@
         .forecast small { color: var(--text-muted); }
         .fc-up { color: #b91c1c; }
         .fc-down { color: var(--primary-dark); }
+        details.ml-panel summary { cursor: pointer; font-weight: 700; color: var(--text-primary); }
+        .cmp-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+        .cmp-name { flex: 0 0 42%; font-size: 12px; }
+        .cmp-bar { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 999px; overflow: hidden; }
+        .cmp-bar i { display: block; height: 100%; background: var(--primary); }
+        .cmp-row b { flex: none; min-width: 46px; text-align: right; color: var(--text-primary); font-size: 12px; }
         .ml-panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); }
         .ml-title { font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
         .ml-row { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; }
@@ -791,6 +797,7 @@
         </section>
 
         <div class="ml-panel" id="mlStores"></div>
+        <details class="ml-panel"><summary><i class="fa-solid fa-scale-balanced"></i> ML algoritmlarni taqqoslash (foizda)</summary><div id="mlCompareBody" style="margin-top:10px"></div></details>
 
         <!-- Sarlavha paneli -->
         <div class="section-header">
@@ -1527,8 +1534,7 @@
 
         function forecastNextMonth(product, store) {
             const ys = priceHistory(product, store);
-            const { slope, intercept } = linearRegression([0, 1, 2, 3, 4, 5], ys);
-            const predicted = Math.max(0, Math.round((slope * 6 + intercept) / 100) * 100);
+            const predicted = Math.max(0, Math.round(bestRegModel().predict(ys) / 100) * 100);
             const current = product.prices[store];
             return { predicted, change: (predicted - current) / current * 100 };
         }
@@ -1547,10 +1553,152 @@
             </div>`;
         }
 
+        // ===== ML TAQQOSLASH: klasterlash va regressiya algoritmlari =====
+        function zscore(X) {
+            const d = X[0].length, mean = [], sd = [];
+            for (let j = 0; j < d; j++) {
+                const col = X.map(r => r[j]);
+                const m = col.reduce((a, b) => a + b, 0) / col.length;
+                mean.push(m);
+                sd.push(Math.sqrt(col.reduce((a, b) => a + (b - m) ** 2, 0) / col.length) || 1);
+            }
+            return X.map(r => r.map((v, j) => (v - mean[j]) / sd[j]));
+        }
+        const euclid = (a, b) => Math.sqrt(a.reduce((s, v, j) => s + (v - b[j]) ** 2, 0));
+
+        // Mahsulotlarni narx segmentlariga ajratish uchun belgilar: log(o'rtacha narx), narx farqi, mavjudlik
+        function productFeatures() {
+            return products.map(p => {
+                const v = STORES.map(s => p.prices[s]).filter(x => x !== null);
+                const mn = Math.min(...v), mx = Math.max(...v);
+                return [Math.log(v.reduce((a, b) => a + b, 0) / v.length), mx / mn - 1, v.length / STORES.length];
+            });
+        }
+
+        // Klasterlash #2: Ierarxik (Agglomerative, average linkage)
+        function agglomerative(Z, k) {
+            const D = Z.map(a => Z.map(b => euclid(a, b)));
+            let clusters = Z.map((_, i) => [i]);
+            const link = (A, B) => { let s = 0; A.forEach(i => B.forEach(j => { s += D[i][j]; })); return s / (A.length * B.length); };
+            while (clusters.length > k) {
+                let bi = 0, bj = 1, bd = Infinity;
+                for (let i = 0; i < clusters.length; i++)
+                    for (let j = i + 1; j < clusters.length; j++) {
+                        const l = link(clusters[i], clusters[j]);
+                        if (l < bd) { bd = l; bi = i; bj = j; }
+                    }
+                clusters[bi] = clusters[bi].concat(clusters[bj]);
+                clusters.splice(bj, 1);
+            }
+            const labels = new Array(Z.length);
+            clusters.forEach((c, ci) => c.forEach(i => { labels[i] = ci; }));
+            return labels;
+        }
+
+        // Klasterlash #3: K-Medoids (markaz sifatida haqiqiy nuqta olinadi)
+        function kMedoids(Z, k, maxIter = 50) {
+            const D = Z.map(a => Z.map(b => euclid(a, b)));
+            const order = Z.map((_, i) => i).sort((a, b) => Z[a][0] - Z[b][0]);
+            let med = Array.from({ length: k }, (_, c) => order[Math.round(c * (Z.length - 1) / (k - 1))]);
+            let labels = new Array(Z.length).fill(0);
+            for (let it = 0; it < maxIter; it++) {
+                labels = Z.map((_, i) => { let b = 0; med.forEach((m, ci) => { if (D[i][m] < D[i][med[b]]) b = ci; }); return b; });
+                const next = med.map((m, ci) => {
+                    const mem = labels.map((l, i) => l === ci ? i : -1).filter(i => i >= 0);
+                    if (!mem.length) return m;
+                    let best = m, bs = Infinity;
+                    mem.forEach(c => { const s = mem.reduce((a, j) => a + D[c][j], 0); if (s < bs) { bs = s; best = c; } });
+                    return best;
+                });
+                if (next.every((m, i) => m === med[i])) break;
+                med = next;
+            }
+            return labels;
+        }
+
+        // Baholash: Silhouette koeffitsienti (-1 ... 1). Foizga o'tkazish: (s + 1) / 2 * 100
+        function silhouette(Z, labels) {
+            const n = Z.length, ks = [...new Set(labels)];
+            let total = 0;
+            for (let i = 0; i < n; i++) {
+                const mean = k => { const idx = labels.map((l, j) => (l === k && j !== i) ? j : -1).filter(j => j >= 0); return idx.length ? idx.reduce((a, j) => a + euclid(Z[i], Z[j]), 0) / idx.length : null; };
+                const a = mean(labels[i]);
+                if (a === null) continue;                       // yakka nuqta: silhouette = 0
+                const b = Math.min(...ks.filter(k => k !== labels[i]).map(mean).filter(v => v !== null));
+                total += (b - a) / Math.max(a, b);
+            }
+            return total / n;
+        }
+
+        function compareClustering() {
+            const Z = zscore(productFeatures());
+            const algos = [["K-Means", () => kMeans(Z, 3).labels], ["Ierarxik (Agglomerative)", () => agglomerative(Z, 3)], ["K-Medoids", () => kMedoids(Z, 3)]];
+            return algos.map(([name, fn]) => { const s = silhouette(Z, fn()); return { name, value: (s + 1) / 2 * 100, raw: s.toFixed(3) }; });
+        }
+
+        // Regressiya #2: Polinomial (2-daraja), #3: Harakatlanuvchi o'rtacha, #4: Holt eksponensial tekislash
+        function polyPredict(ys) {
+            const n = ys.length, xm = (n - 1) / 2, xs = ys.map((_, i) => i - xm);
+            const S = p => xs.reduce((a, x) => a + x ** p, 0), T = p => xs.reduce((a, x, i) => a + ys[i] * x ** p, 0);
+            const A = [[S(0), S(1), S(2), T(0)], [S(1), S(2), S(3), T(1)], [S(2), S(3), S(4), T(2)]];
+            for (let i = 0; i < 3; i++) {
+                let piv = i;
+                for (let r = i + 1; r < 3; r++) if (Math.abs(A[r][i]) > Math.abs(A[piv][i])) piv = r;
+                [A[i], A[piv]] = [A[piv], A[i]];
+                for (let r = 0; r < 3; r++) {
+                    if (r === i) continue;
+                    const f = A[r][i] / A[i][i];
+                    for (let c = i; c < 4; c++) A[r][c] -= f * A[i][c];
+                }
+            }
+            const x = n - xm;
+            return A[0][3] / A[0][0] + A[1][3] / A[1][1] * x + A[2][3] / A[2][2] * x * x;
+        }
+        function holtPredict(ys, a = 0.6, b = 0.3) {
+            let l = ys[0], t = ys[1] - ys[0];
+            for (let i = 1; i < ys.length; i++) { const pl = l; l = a * ys[i] + (1 - a) * (l + t); t = b * (l - pl) + (1 - b) * t; }
+            return l + t;
+        }
+        const REG_MODELS = [
+            { name: "Chiziqli regressiya (OLS)", predict: ys => { const r = linearRegression(ys.map((_, i) => i), ys); return r.slope * ys.length + r.intercept; } },
+            { name: "Polinomial regressiya (2-daraja)", predict: polyPredict },
+            { name: "Harakatlanuvchi o'rtacha (3 oy)", predict: ys => ys.slice(-3).reduce((a, b) => a + b, 0) / 3 },
+            { name: "Eksponensial tekislash (Holt)", predict: holtPredict }
+        ];
+
+        // Baholash (backtest): dastlabki 5 oy bo'yicha 6-oyni bashorat qilamiz. Aniqlik = 100 - MAPE
+        let regResults = null;
+        function compareRegression() {
+            if (regResults) return regResults;
+            const acc = REG_MODELS.map(m => ({ name: m.name, err: 0, n: 0 }));
+            products.forEach(p => STORES.forEach(s => {
+                if (p.prices[s] === null) return;
+                const ys = priceHistory(p, s), train = ys.slice(0, 5), actual = ys[5];
+                acc.forEach((r, i) => { r.err += Math.abs(REG_MODELS[i].predict(train) - actual) / actual; r.n++; });
+            }));
+            regResults = acc.map((r, i) => ({ name: r.name, value: Math.max(0, 100 - r.err / r.n * 100), model: REG_MODELS[i] }));
+            return regResults;
+        }
+        function bestRegModel() { return compareRegression().reduce((a, b) => b.value > a.value ? b : a).model; }
+
+        function renderComparison() {
+            const bars = (rows, label) => {
+                const best = Math.max(...rows.map(r => r.value));
+                return rows.map(r => `<div class="cmp-row"><span class="cmp-name">${r.name}${r.value === best ? ' 🏆' : ''}</span>
+                    <div class="cmp-bar"><i style="width:${r.value.toFixed(1)}%"></i></div><b>${r.value.toFixed(1)}%</b></div>`).join('');
+            };
+            document.getElementById('mlCompareBody').innerHTML =
+                `<div class="ml-title">Klasterlash (mahsulot narx segmentlari, 3 guruh)</div>${bars(compareClustering())}
+                 <small>Ko'rsatkich: Silhouette koeffitsienti, foizga o'tkazilgan: (s+1)/2·100.</small>
+                 <div class="ml-title" style="margin-top:14px">Regressiya (narx bashorati, backtest)</div>${bars(compareRegression())}
+                 <small>Ko'rsatkich: aniqlik = 100 − MAPE. Dastlabki 5 oy bo'yicha 6-oy bashorat qilingan. Tarix namunaviy, shuning uchun natija faqat demo.</small>`;
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             initTheme();
             renderCategories();
             renderStoreClusters();
+            renderComparison();
             filterAndRenderProducts();
         });
     </script>
